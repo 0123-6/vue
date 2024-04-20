@@ -3,6 +3,7 @@ import type { ComponentOptions } from 'types/options'
 import type { VNodeComponentOptions, VNodeData } from 'types/vnode'
 
 /**
+ * VNode类
  * @internal
  */
 export default class VNode {
@@ -84,6 +85,10 @@ export const createEmptyVNode = (text: string = '') => {
   return node
 }
 
+/**
+ * 创建一个文本VNode
+ * @param val
+ */
 export function createTextVNode(val: string | number) {
   return new VNode(undefined, undefined, undefined, String(val))
 }

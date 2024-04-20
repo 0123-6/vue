@@ -69,8 +69,13 @@ function pruneCacheEntry(
   remove(keys, key)
 }
 
+// 模式类型
 const patternTypes: Array<Function> = [String, RegExp, Array]
 
+/**
+ * keep-alive的工作原理
+ * ????
+ */
 // TODO defineComponent
 export default {
   name: 'keep-alive',

@@ -1,38 +1,35 @@
-import config from '../config'
 import { initProxy } from './proxy'
 import { initState } from './state'
 import { initRender } from './render'
 import { initEvents } from './events'
-import { mark, measure } from '../util/perf'
 import { initLifecycle, callHook } from './lifecycle'
 import { initProvide, initInjections } from './inject'
-import { extend, mergeOptions, formatComponentName } from '../util/index'
+import { extend, mergeOptions } from '../util/index'
 import type { Component } from 'types/component'
 import type { InternalComponentOptions } from 'types/options'
 import { EffectScope } from 'v3/reactivity/effectScope'
 
+// vm.uid,从0开始，是vm的唯一标识
 let uid = 0
 
+/**
+ * initMixin函数，参数为Vue构造函数，作用为给Vue.prototype添加一个_init方法
+ * @param Vue
+ */
 export function initMixin(Vue: typeof Component) {
+  // 给Vue.prototype._init赋值
   Vue.prototype._init = function (options?: Record<string, any>) {
+    // 定义vm指向当前this
     const vm: Component = this
     // a uid
     vm._uid = uid++
-
-    let startTag, endTag
-    /* istanbul ignore if */
-    if (__DEV__ && config.performance && mark) {
-      startTag = `vue-perf-start:${vm._uid}`
-      endTag = `vue-perf-end:${vm._uid}`
-      mark(startTag)
-    }
-
     // a flag to mark this as a Vue instance without having to do instanceof
     // check
     vm._isVue = true
     // avoid instances from being observed
     vm.__v_skip = true
     // effect scope
+    // ？？？
     vm._scope = new EffectScope(true /* detached */)
     // #13134 edge case where a child component is manually created during the
     // render of a parent component
@@ -45,6 +42,7 @@ export function initMixin(Vue: typeof Component) {
       // internal component options needs special treatment.
       initInternalComponent(vm, options as any)
     } else {
+      // new Vue()会进入到这里
       vm.$options = mergeOptions(
         resolveConstructorOptions(vm.constructor as any),
         options || {},
@@ -59,23 +57,32 @@ export function initMixin(Vue: typeof Component) {
     }
     // expose real self
     vm._self = vm
+    // 初始化生命周期
     initLifecycle(vm)
+    // 初始化事件
     initEvents(vm)
+    // 初始化render
     initRender(vm)
+    // 调用beforeCreate钩子
+    // 在vm初始化之后，进行数据侦听和事件侦听之前同步调用
     callHook(vm, 'beforeCreate', undefined, false /* setContext */)
+    // 初始化注入
     initInjections(vm) // resolve injections before data/props
+    // 重点，将data和props响应式化
     initState(vm)
     initProvide(vm) // resolve provide after data/props
+    // vm创建完成后同步调用
     callHook(vm, 'created')
-
-    /* istanbul ignore if */
-    if (__DEV__ && config.performance && mark) {
-      vm._name = formatComponentName(vm, false)
-      mark(endTag)
-      measure(`vue ${vm._name} init`, startTag, endTag)
-    }
-
+    // 如果options存在el属性，则调用vm.$mount方法
     if (vm.$options.el) {
+      // 不使用单文件组件时，定义位于platforms/web/runtime-with-compiler.ts
+      // 先将el编译，在挂载
+
+      // 使用单文件组件时，会进入platforms/web/runtime/index.ts方法
+      // 这是Vue.prototype.$mount的原生定义
+      // 但是包含编译器的Vue版本中，会被覆盖
+      // 这个方法基本啥也没做，只是获取了el对应的实际DOM元素
+      // 然后返回调用mountComponent(this, el);
       vm.$mount(vm.$options.el)
     }
   }

@@ -10,7 +10,6 @@ import type { Component } from 'types/component'
 import type { MountedComponentVNode } from 'types/vnode'
 
 import {
-  warn,
   noop,
   remove,
   emptyObject,
@@ -32,6 +31,10 @@ export function setActiveInstance(vm: Component) {
   }
 }
 
+/**
+ * vm第一步，初始化生命周期
+ * @param vm
+ */
 export function initLifecycle(vm: Component) {
   const options = vm.$options
 
@@ -59,7 +62,18 @@ export function initLifecycle(vm: Component) {
   vm._isBeingDestroyed = false
 }
 
+/**
+ * lifecycleMixin函数，给Vue.prototype添加生命周期相关方法
+ * Vue.prototype._update
+ * Vue.prototype.$forceUpdate
+ * Vue.prototype.$destroy
+ */
 export function lifecycleMixin(Vue: typeof Component) {
+  /**
+   *
+   * @param vnode
+   * @param hydrating
+   */
   Vue.prototype._update = function (vnode: VNode, hydrating?: boolean) {
     const vm: Component = this
     const prevEl = vm.$el
@@ -70,6 +84,7 @@ export function lifecycleMixin(Vue: typeof Component) {
     // based on the rendering backend used.
     if (!prevVnode) {
       // initial render
+      // 精彩内容
       vm.$el = vm.__patch__(vm.$el, vnode, hydrating, false /* removeOnly */)
     } else {
       // updates
@@ -98,6 +113,9 @@ export function lifecycleMixin(Vue: typeof Component) {
     // updated in a parent's updated hook.
   }
 
+  /**
+   * 迫使 Vue 实例重新渲染。注意它仅仅影响实例本身和插入插槽内容的子组件，而不是所有子组件。
+   */
   Vue.prototype.$forceUpdate = function () {
     const vm: Component = this
     if (vm._watcher) {
@@ -105,6 +123,10 @@ export function lifecycleMixin(Vue: typeof Component) {
     }
   }
 
+  /**
+   * 完全销毁一个实例。清理它与其它实例的连接，解绑它的全部指令及事件监听器。
+   * 在大多数场景中你不应该调用这个方法。最好使用 v-if 和 v-for 指令以数据驱动的方式控制子组件的生命周期。
+   */
   Vue.prototype.$destroy = function () {
     const vm: Component = this
     if (vm._isBeingDestroyed) {
@@ -149,31 +171,18 @@ export function mountComponent(
   el: Element | null | undefined,
   hydrating?: boolean
 ): Component {
+  // 设置vm.$el = el
   vm.$el = el
+  // 使用单文件组件的话，因为在编译时已经将template转换为render函数，所以无需使用vue的完整版，
+  // 使用不带template编译的版本即可
+  // 如果不存在render函数，那么将render函数设置为空VNode
   if (!vm.$options.render) {
     // @ts-expect-error invalid type
     vm.$options.render = createEmptyVNode
-    if (__DEV__) {
-      /* istanbul ignore if */
-      if (
-        (vm.$options.template && vm.$options.template.charAt(0) !== '#') ||
-        vm.$options.el ||
-        el
-      ) {
-        warn(
-          'You are using the runtime-only build of Vue where the template ' +
-            'compiler is not available. Either pre-compile the templates into ' +
-            'render functions, or use the compiler-included build.',
-          vm
-        )
-      } else {
-        warn(
-          'Failed to mount component: template or render function not defined.',
-          vm
-        )
-      }
-    }
   }
+  // 调用beforeMount钩子
+  // 和created钩子基本在一起，中间做了将el或template编译为render的工作
+  // 如果render已经存在，则基本没有做什么工作
   callHook(vm, 'beforeMount')
 
   let updateComponent
@@ -196,13 +205,16 @@ export function mountComponent(
       measure(`vue ${name} patch`, startTag, endTag)
     }
   } else {
+    // 定义updateComponent函数，作为一个watcher对象的表达式
     updateComponent = () => {
       vm._update(vm._render(), hydrating)
     }
   }
-
+  // watcher观察者的配置
   const watcherOptions: WatcherOptions = {
+    // 观察者在更新前调用的函数，
     before() {
+      // 如果vm存在，vm已挂载，而且vm没有被销毁，则调用beforeUpdate钩子
       if (vm._isMounted && !vm._isDestroyed) {
         callHook(vm, 'beforeUpdate')
       }
@@ -217,6 +229,10 @@ export function mountComponent(
   // we set this to vm._watcher inside the watcher's constructor
   // since the watcher's initial patch may call $forceUpdate (e.g. inside child
   // component's mounted hook), which relies on vm._watcher being already defined
+  // 将updateComponent作为函数传入watcher类
+
+  // 定义一个无法被访问的观察者，updateComponent作为观察的函数，自动收集依赖？
+  // 回调函数为空？那么变化时是如何触发更新的？
   new Watcher(
     vm,
     updateComponent,
@@ -224,6 +240,7 @@ export function mountComponent(
     watcherOptions,
     true /* isRenderWatcher */
   )
+  // 不是SSR
   hydrating = false
 
   // flush buffer for flush: "pre" watchers queued in setup()
@@ -238,6 +255,7 @@ export function mountComponent(
   // mounted is called for render-created child components in its inserted hook
   if (vm.$vnode == null) {
     vm._isMounted = true
+    // 调用mounted钩子
     callHook(vm, 'mounted')
   }
   return vm
@@ -391,6 +409,13 @@ export function deactivateChildComponent(vm: Component, direct?: boolean) {
   }
 }
 
+/**
+ * 调用钩子函数的方法
+ * @param vm
+ * @param hook
+ * @param args
+ * @param setContext
+ */
 export function callHook(
   vm: Component,
   hook: string,
@@ -402,6 +427,7 @@ export function callHook(
   const prevInst = currentInstance
   const prevScope = getCurrentScope()
   setContext && setCurrentInstance(vm)
+  // 从vm.$options中获取指定hook，比如beforeCreate
   const handlers = vm.$options[hook]
   const info = `${hook} hook`
   if (handlers) {

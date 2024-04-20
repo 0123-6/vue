@@ -33,6 +33,9 @@ export interface Config {
   _lifecycleHooks: Array<string>
 }
 
+/**
+ * Vue.config，保存了Vue构造函数本身的一些信息
+ */
 export default {
   /**
    * Option merge strategies (used in core/util/options)

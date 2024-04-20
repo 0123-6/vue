@@ -3,7 +3,17 @@ import { CompilerOptions, CompiledResult, WarningMessage } from 'types/compiler'
 import { detectErrors } from './error-detector'
 import { createCompileToFunctionFn } from './to-function'
 
+/**
+ * createCompilerCreator,是一个闭包函数，创建编译器的创建函数,
+ * 参数为真正的编译函数
+ * 返回值为一个函数，该函数接收一个options参数对象，
+ * 返回一个对象，包含2个属性，compile函数，compileToFunctions
+ * 其中compile函数接收2个参数，1个字符串类型的el.outerHTML,1个配置对象,返回编译后的结果
+ * compileToFunctions
+ * @param baseCompile
+ */
 export function createCompilerCreator(baseCompile: Function): Function {
+  // baseOptions为platforms/web/compiler/options.ts导出的对象
   return function createCompiler(baseOptions: CompilerOptions) {
     function compile(
       template: string,
@@ -74,7 +84,7 @@ export function createCompilerCreator(baseCompile: Function): Function {
       compiled.tips = tips
       return compiled
     }
-
+    // 返回一个对象，有2个属性compile,compileToFunctions
     return {
       compile,
       compileToFunctions: createCompileToFunctionFn(compile)

@@ -1,10 +1,9 @@
-import { isServerRendering, noop, warn, def, isFunction } from 'core/util'
+import { noop, warn, def, isFunction } from 'core/util'
 import { Ref, RefFlag } from './ref'
 import Watcher from 'core/observer/watcher'
 import Dep from 'core/observer/dep'
 import { currentInstance } from '../currentInstance'
 import { ReactiveFlags } from './reactive'
-import { TrackOpTypes } from './operations'
 import { DebuggerOptions } from '../debug'
 
 declare const ComputedRefSymbol: unique symbol
@@ -54,39 +53,20 @@ export function computed<T>(
     setter = getterOrOptions.set
   }
 
-  const watcher = isServerRendering()
-    ? null
-    : new Watcher(currentInstance, getter, noop, { lazy: true })
-
-  if (__DEV__ && watcher && debugOptions) {
-    watcher.onTrack = debugOptions.onTrack
-    watcher.onTrigger = debugOptions.onTrigger
-  }
+  const watcher = new Watcher(currentInstance, getter, noop, { lazy: true })
 
   const ref = {
     // some libs rely on the presence effect for checking computed refs
     // from normal refs, but the implementation doesn't matter
     effect: watcher,
     get value() {
-      if (watcher) {
-        if (watcher.dirty) {
-          watcher.evaluate()
-        }
-        if (Dep.target) {
-          if (__DEV__ && Dep.target.onTrack) {
-            Dep.target.onTrack({
-              effect: Dep.target,
-              target: ref,
-              type: TrackOpTypes.GET,
-              key: 'value'
-            })
-          }
-          watcher.depend()
-        }
-        return watcher.value
-      } else {
-        return getter()
+      if (watcher.dirty) {
+        watcher.evaluate()
       }
+      if (Dep.target) {
+        watcher.depend()
+      }
+      return watcher.value
     },
     set value(newVal) {
       setter(newVal)

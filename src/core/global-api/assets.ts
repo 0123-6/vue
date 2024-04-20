@@ -5,6 +5,7 @@ import { isFunction, isPlainObject, validateComponentName } from '../util/index'
 export function initAssetRegisters(Vue: GlobalAPI) {
   /**
    * Create asset registration methods.
+   * 定义Vue.options对象的3个资源的定义方法
    */
   ASSET_TYPES.forEach(type => {
     // @ts-expect-error function is not exact same type

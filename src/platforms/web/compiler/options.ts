@@ -11,6 +11,9 @@ import { genStaticKeys } from 'shared/util'
 import { isUnaryTag, canBeLeftOpenTag } from './util'
 import { CompilerOptions } from 'types/compiler'
 
+/**
+ * template编译为render需要用到的baseOption
+ */
 export const baseOptions: CompilerOptions = {
   expectHTML: true,
   modules,

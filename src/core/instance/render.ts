@@ -68,6 +68,7 @@ export function initRender(vm: Component) {
       true
     )
   } else {
+    // 将vm.$attrs定义为响应式
     defineReactive(
       vm,
       '$attrs',
@@ -75,6 +76,7 @@ export function initRender(vm: Component) {
       null,
       true
     )
+    // 将vm.$listeners定义为响应式
     defineReactive(
       vm,
       '$listeners',
@@ -92,14 +94,26 @@ export function setCurrentRenderingInstance(vm: Component) {
   currentRenderingInstance = vm
 }
 
+/**
+ * 定义Vue.prototype.$nextTick
+ * 定义Vue.prototype._render
+ * @param Vue
+ */
 export function renderMixin(Vue: typeof Component) {
   // install runtime convenience helpers
+  // 给Vue.prototype定义一系列方法
   installRenderHelpers(Vue.prototype)
 
+  // 定义Vue.prototype.$nextTick
+  // Vue.prototype.$nextTick = nextTick.bind(this)可行？
   Vue.prototype.$nextTick = function (fn: (...args: any[]) => any) {
     return nextTick(fn, this)
   }
 
+  /**
+   * 定义Vue.prototype._render方法
+   * 返回一个VNode对象
+   */
   Vue.prototype._render = function (): VNode {
     const vm: Component = this
     const { render, _parentVnode } = vm.$options

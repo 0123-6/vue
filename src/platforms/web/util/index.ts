@@ -9,6 +9,7 @@ export * from './element'
  */
 export function query(el: string | Element): Element {
   if (typeof el === 'string') {
+    // 返回DOM树中第一个匹配的Element对象
     const selected = document.querySelector(el)
     if (!selected) {
       __DEV__ && warn('Cannot find element: ' + el)

@@ -39,9 +39,9 @@
   },
   "sideEffects": false,
   "scripts": {
-    "dev": "rollup -w -c scripts/config.js --environment TARGET:full-dev",
+    "dev": "rollup -w -c scripts/config.js --environment TARGET:full-dev --sourcemap",
     "dev:cjs": "rollup -w -c scripts/config.js --environment TARGET:runtime-cjs-dev",
-    "dev:esm": "rollup -w -c scripts/config.js --environment TARGET:runtime-esm",
+    "dev:esm": "rollup -w -c scripts/config.js --environment TARGET:runtime-esm --sourcemap",
     "dev:ssr": "rollup -w -c scripts/config.js --environment TARGET:server-renderer",
     "dev:compiler": "rollup -w -c scripts/config.js --environment TARGET:compiler ",
     "build": "node scripts/build.js",

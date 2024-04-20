@@ -10,6 +10,7 @@ import { EffectScope } from 'v3/reactivity/effectScope'
 
 /**
  * @internal
+ * vm的结构
  */
 export declare class Component {
   constructor(options?: any)

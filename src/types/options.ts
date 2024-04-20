@@ -14,6 +14,7 @@ export type InternalComponentOptions = {
 type InjectKey = string | Symbol
 
 /**
+ * new Vue(options),options的结构
  * @internal
  */
 export type ComponentOptions = {

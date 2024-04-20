@@ -2,6 +2,7 @@ import { Config } from 'core/config'
 import { Component } from './component'
 
 /**
+ * Vue构造函数的结构
  * @internal
  */
 export interface GlobalAPI {

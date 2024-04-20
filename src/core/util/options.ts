@@ -407,6 +407,7 @@ function assertObjectType(name: string, value: any, vm: Component | null) {
 /**
  * Merge two option objects into a new one.
  * Core utility used in both instantiation and inheritance.
+ * 合并对象，这是Vue的核心实用方法之一
  */
 export function mergeOptions(
   parent: Record<string, any>,

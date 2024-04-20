@@ -1,3 +1,7 @@
+/**
+ * shared/util.ts定义了一些全局公共方法
+ */
+
 export const emptyObject: Record<string, any> = Object.freeze({})
 
 export const isArray = Array.isArray
