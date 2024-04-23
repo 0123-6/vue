@@ -1,5 +1,7 @@
+debugger
 const myVue = new Vue({
-  el: '#vue',
+  el: '#app',
+  template: `<div style="display: flex;flex-direction: column;"><span>{{name}}</span><span>{{age}}</span></div>`,
   data() {
     return {
       name: '韩佩江',

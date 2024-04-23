@@ -1,12 +1,9 @@
 import {
-  warn,
   remove,
   isObject,
   parsePath,
   _Set as Set,
-  handleError,
   invokeWithErrorHandling,
-  noop,
   isFunction
 } from '../util/index'
 
@@ -78,7 +75,7 @@ export default class Watcher implements DepTarget {
    * @param expOrFn 要观察的表达式或函数
    * @param cb 观察者发生变化时的回调函数
    * @param options 配置选项
-   * @param isRenderWatcher
+   * @param isRenderWatcher 是否是render watcher
    */
   constructor(
     vm: Component | null,
@@ -97,77 +94,78 @@ export default class Watcher implements DepTarget {
         ? vm._scope
         : undefined
     )
+    // 如果是渲染观察者
     if ((this.vm = vm) && isRenderWatcher) {
+      // 将vm._watcher指向这个观察者对象,用来强制刷新组件
       vm._watcher = this
     }
-    // options
+    // options存在
     if (options) {
+      // 是否深度观察,渲染观察者为false
       this.deep = !!options.deep
       this.user = !!options.user
       this.lazy = !!options.lazy
       this.sync = !!options.sync
       // before函数,主要用于vm更新时，触发beforeUpdate函数
       this.before = options.before
-      if (__DEV__) {
-        this.onTrack = options.onTrack
-        this.onTrigger = options.onTrigger
-      }
     } else {
+      // options不存在，默认全是false
       this.deep = this.user = this.lazy = this.sync = false
     }
+    // 回调函数
     this.cb = cb
+    // watcher.id
     this.id = ++uid // uid for batching
+    // 是否是活跃状态
     this.active = true
+    // ???
     this.post = false
+    // 是否是脏数据,需要更新，用于惰性观察者
     this.dirty = this.lazy // for lazy watchers
+    // 依赖数组
     this.deps = []
+    // 新一次get过程中接触的依赖数组,watcher可以自动收集依赖
     this.newDeps = []
+    // 依赖数组对应的set
     this.depIds = new Set()
+    // 新一次get过程中对应的set
     this.newDepIds = new Set()
-    this.expression = __DEV__ ? expOrFn.toString() : ''
+    // watcher的表达式
+    this.expression = ''
     // parse expression for getter
-    if (isFunction(expOrFn)) {
-      this.getter = expOrFn
-    } else {
-      this.getter = parsePath(expOrFn)
-      if (!this.getter) {
-        this.getter = noop
-        __DEV__ &&
-          warn(
-            `Failed watching path: "${expOrFn}" ` +
-              'Watcher only accepts simple dot-delimited paths. ' +
-              'For full control, use a function instead.',
-            vm
-          )
-      }
-    }
+    // 设置watcher.getter函数
+    this.getter = isFunction(expOrFn) ? expOrFn : parsePath(expOrFn)
+    // 设置watcher.value
     this.value = this.lazy ? undefined : this.get()
   }
 
   /**
    * Evaluate the getter, and re-collect dependencies.
+   * 获取watcher观察者的值，同时重新收集依赖
+   * get方法主要由6部分组成
+   * 1. 将当前watcher放入全局targetStack栈,同时将Dep.target指向当前watcher
+   * 2. 调用this.getter(this.vm, this.vm)函数
+   * 3. 如果是深度监听，则遍历获得的value？？？为什么？？？
+   * 4. 获取值结束，当前watcher不再观察，从targetStack栈中弹出，重置Dep.target
+   * 5. 进行依赖收集的清理工作
+   * 6. 返回value
    */
   get() {
+    // 将当前watcher放入全局的targetStack栈中,同时将Dep.target指向当前watcher
     pushTarget(this)
-    let value
-    const vm = this.vm
-    try {
-      value = this.getter.call(vm, vm)
-    } catch (e: any) {
-      if (this.user) {
-        handleError(e, vm, `getter for watcher "${this.expression}"`)
-      } else {
-        throw e
-      }
-    } finally {
-      // "touch" every property so they are all tracked as
-      // dependencies for deep watching
-      if (this.deep) {
-        traverse(value)
-      }
-      popTarget()
-      this.cleanupDeps()
+
+    let value = this.getter.call(this.vm, this.vm)
+    // "touch" every property so they are all tracked as
+    // dependencies for deep watching
+    if (this.deep) {
+      traverse(value)
     }
+
+    // 获取值结束，当前watcher不再观察，从targetStack栈中弹出，重置Dep.target
+    popTarget()
+    // 进行依赖收集的清理工作
+    this.cleanupDeps()
+
     return value
   }
 
@@ -195,6 +193,7 @@ export default class Watcher implements DepTarget {
 
   /**
    * Clean up for dependency collection.
+   * 依赖收集完成的清理和重置工作
    */
   cleanupDeps() {
     let i = this.deps.length
@@ -237,33 +236,40 @@ export default class Watcher implements DepTarget {
   /**
    * Scheduler job interface.
    * Will be called by the scheduler.
+   * watcher.update方法最终执行的run方法
+   * 1. 优化直接返回
+   * 2. 调用this.get()获取watcher.value
+   * 3. 调用watcher.cb
    */
   run() {
-    if (this.active) {
-      const value = this.get()
-      if (
-        value !== this.value ||
-        // Deep watchers and watchers on Object/Arrays should fire even
-        // when the value is the same, because the value may
-        // have mutated.
-        isObject(value) ||
-        this.deep
-      ) {
-        // set new value
-        const oldValue = this.value
-        this.value = value
-        if (this.user) {
-          const info = `callback for watcher "${this.expression}"`
-          invokeWithErrorHandling(
-            this.cb,
-            this.vm,
-            [value, oldValue],
-            this.vm,
-            info
-          )
-        } else {
-          this.cb.call(this.vm, value, oldValue)
-        }
+    // 优化，如果当前观察者不再活跃，直接返回
+    if (!this.active) {
+      return;
+    }
+
+    const value = this.get()
+    if (
+      value !== this.value ||
+      // Deep watchers and watchers on Object/Arrays should fire even
+      // when the value is the same, because the value may
+      // have mutated.
+      isObject(value) ||
+      this.deep
+    ) {
+      // set new value
+      const oldValue = this.value
+      this.value = value
+      if (this.user) {
+        const info = `callback for watcher "${this.expression}"`
+        invokeWithErrorHandling(
+          this.cb,
+          this.vm,
+          [value, oldValue],
+          this.vm,
+          info
+        )
+      } else {
+        this.cb.call(this.vm, value, oldValue)
       }
     }
   }

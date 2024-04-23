@@ -39,6 +39,12 @@ const sharedPropertyDefinition = {
   set: noop
 }
 
+/**
+ * 在vm上设置data的每一个属性的代理
+ * @param target
+ * @param sourceKey
+ * @param key
+ */
 export function proxy(target: Object, sourceKey: string, key: string) {
   sharedPropertyDefinition.get = function proxyGetter() {
     return this[sourceKey][key]
@@ -143,41 +149,13 @@ function initData(vm: Component) {
   // 获取data
   let data: any = vm.$options.data
   data = vm._data = isFunction(data) ? getData(data, vm) : data || {}
-  // data只能是普通Object对象
-  if (!isPlainObject(data)) {
-    data = {}
-    __DEV__ &&
-      warn(
-        'data functions should return an object:\n' +
-          'https://v2.vuejs.org/v2/guide/components.html#data-Must-Be-a-Function',
-        vm
-      )
-  }
-  // proxy data on instance
-  const keys = Object.keys(data)
-  const props = vm.$options.props
-  const methods = vm.$options.methods
-  let i = keys.length
-  while (i--) {
-    const key = keys[i]
-    if (__DEV__) {
-      if (methods && hasOwn(methods, key)) {
-        warn(`Method "${key}" has already been defined as a data property.`, vm)
-      }
-    }
-    if (props && hasOwn(props, key)) {
-      __DEV__ &&
-        warn(
-          `The data property "${key}" is already declared as a prop. ` +
-            `Use prop default value instead.`,
-          vm
-        )
-    } else if (!isReserved(key)) {
+  // 遍历key，在vm上设置映射
+  for (const key of Object.keys(data)) {
+    if (!isReserved(key)) {
       // 在vm上定义key的代理
       proxy(vm, `_data`, key)
     }
   }
-  // observe data
   // 将data可观察化
   const ob = observe(data)
   ob && ob.vmCount++

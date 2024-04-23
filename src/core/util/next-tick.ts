@@ -2,9 +2,7 @@
 /**
  * 使用方法，实现了next-tick函数
  */
-import { noop } from 'shared/util'
-import { handleError } from './error'
-import { isIE, isIOS, isNative } from './env'
+import { isIE, isNative } from './env'
 
 // 是否使用微任务,默认不使用
 export let isUsingMicroTask = false
@@ -56,12 +54,6 @@ if (typeof Promise !== 'undefined' && isNative(Promise)) {
   const p = Promise.resolve()
   timerFunc = () => {
     p.then(flushCallbacks)
-    // In problematic UIWebViews, Promise.then doesn't completely break, but
-    // it can get stuck in a weird state where callbacks are pushed into the
-    // microtask queue but the queue isn't being flushed, until the browser
-    // needs to do some other work, e.g. handle a timer. Therefore we can
-    // "force" the microtask queue to be flushed by adding an empty timer.
-    if (isIOS) setTimeout(noop)
   }
   isUsingMicroTask = true
 } else if (
@@ -99,6 +91,7 @@ if (typeof Promise !== 'undefined' && isNative(Promise)) {
   }
 }
 
+// @ts-ignore
 export function nextTick(): Promise<void>
 export function nextTick<T>(this: T, cb: (this: T, ...args: any[]) => any): void
 export function nextTick<T>(cb: (this: T, ...args: any[]) => any, ctx: T): void
@@ -107,30 +100,14 @@ export function nextTick<T>(cb: (this: T, ...args: any[]) => any, ctx: T): void
  * @internal
  */
 export function nextTick(cb?: (...args: any[]) => any, ctx?: object) {
-  let _resolve
   // 将cb放入callbacks数组中
-  callbacks.push(() => {
-    if (cb) {
-      try {
-        cb.call(ctx)
-      } catch (e: any) {
-        handleError(e, ctx, 'nextTick')
-      }
-    } else if (_resolve) {
-      _resolve(ctx)
-    }
-  })
+  // @ts-ignore
+  callbacks.push(cb.bind(ctx))
   // 如果不是待办
   if (!pending) {
     // 设置为待办
     pending = true
     // 将callbacks放入到延迟任务
     timerFunc()
-  }
-  // $flow-disable-line
-  if (!cb && typeof Promise !== 'undefined') {
-    return new Promise(resolve => {
-      _resolve = resolve
-    })
   }
 }

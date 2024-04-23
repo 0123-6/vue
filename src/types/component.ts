@@ -90,6 +90,7 @@ export declare class Component {
   _self: Component
   _renderProxy: Component
   _renderContext?: Component
+  // 指向vm的渲染函数的watcher对象
   _watcher: Watcher | null
   _scope: EffectScope
   _computedWatchers: { [key: string]: Watcher }

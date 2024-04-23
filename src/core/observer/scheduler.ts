@@ -3,7 +3,7 @@ import config from '../config'
 import Dep, { cleanupDeps } from './dep'
 import { callHook, activateChildComponent } from '../instance/lifecycle'
 
-import { warn, nextTick, devtools, inBrowser, isIE } from '../util/index'
+import { nextTick, devtools } from '../util/index'
 import type { Component } from 'types/component'
 
 // 脚本作用域
@@ -18,13 +18,14 @@ const activatedChildren: Array<Component> = []
 
 // has对象，是否id为id的watcher存在
 let has: { [key: number]: true | undefined | null } = {}
-// 对象，表示为key的watcher更新次数？？？
-let circular: { [key: number]: number } = {}
-// 是否等待中
+// 当前调度程序是否等待执行，
+// 也就是说，当一次主任务执行完毕后，是否有微任务等待执行
+// 每次queueWatcher向调度程序添加观察者时，会检查这个变量，
+// 如果为false，则会改为true
 let waiting = false
 // 是否刷新中
 let flushing = false
-// ???
+// 当前刷新的queue的index
 let index = 0
 
 /**
@@ -38,11 +39,8 @@ function resetSchedulerState() {
   index = queue.length = activatedChildren.length = 0
   // 重置表示观察者是否存在的has对象
   has = {}
-  if (__DEV__) {
-    circular = {}
-  }
   // 设置等待状态为false
-  // 设置筛选状态为false
+  // 设置刷新状态为false
   waiting = flushing = false
 }
 
@@ -53,31 +51,6 @@ function resetSchedulerState() {
 // attached during that flush.
 // 现在筛选用的时间
 export let currentFlushTimestamp = 0
-
-// Async edge case fix requires storing an event listener's attach timestamp.
-// 获取当前时间戳
-let getNow: () => number = Date.now
-
-// Determine what event timestamp the browser is using. Annoyingly, the
-// timestamp can either be hi-res (relative to page load) or low-res
-// (relative to UNIX epoch), so in order to compare time we have to use the
-// same timestamp type when saving the flush timestamp.
-// All IE versions use low-res event timestamps, and have problematic clock
-// implementations (#9632)
-if (inBrowser && !isIE) {
-  const performance = window.performance
-  if (
-    performance &&
-    typeof performance.now === 'function' &&
-    getNow() > document.createEvent('Event').timeStamp
-  ) {
-    // if the event timestamp, although evaluated AFTER the Date.now(), is
-    // smaller than it, it means the event is using a hi-res timestamp,
-    // and we need to use the hi-res version for event listener timestamps as
-    // well.
-    getNow = () => performance.now()
-  }
-}
 
 /**
  * 观察者的比较函数,
@@ -99,14 +72,18 @@ const sortCompareFn = (a: Watcher, b: Watcher): number => {
 
 /**
  * Flush both queues and run the watchers.
- * 刷新
+ * 主方法，刷新队列,分3步
+ * 1. 将flushing设置为true
+ * 2. 将queue排序，优化刷新效率
+ * 3. 遍历queue，调用每一项watcher的before()方法,将has[watcher.id]设置为null，调用watcher.run()方法
+ * 4. 调用resetSchedulerState方法重置状态
+ * 5. 调用观察者对应的vm的updated钩子函数
  */
 function flushSchedulerQueue() {
   // 设置当前时间戳
-  currentFlushTimestamp = getNow()
+  currentFlushTimestamp = window.performance.now()
   // 刷新状态为true，表示正在刷新中
   flushing = true
-  let watcher, id
 
   // Sort queue before flush.
   // This ensures that:
@@ -130,32 +107,16 @@ function flushSchedulerQueue() {
   // 不可以缓存queue的长度，因为在watcher执行期间，可能会往queue放入新的watcher
   for (index = 0; index < queue.length; index++) {
     // 取出一个观察者
-    watcher = queue[index]
+    const watcher = queue[index]
     // watcher.before的用武之地，如果watcher.before函数存在，则执行
     // 1个场景是vm更新时会触发beforeUpdate钩子
     if (watcher.before) {
       watcher.before()
     }
-    // 获取watcher的id
-    id = watcher.id
-    // has[id]设置为null
-    has[id] = null
+    // has[watcher.id]设置为null
+    has[watcher.id] = null
     // 执行watcher的run函数
     watcher.run()
-    // in dev build, check and stop circular updates.
-    if (__DEV__ && has[id] != null) {
-      circular[id] = (circular[id] || 0) + 1
-      if (circular[id] > MAX_UPDATE_COUNT) {
-        warn(
-          'You may have an infinite update loop ' +
-            (watcher.user
-              ? `in watcher with expression "${watcher.expression}"`
-              : `in a component render function.`),
-          watcher.vm
-        )
-        break
-      }
-    }
   }
 
   // keep copies of post queues before resetting state
@@ -222,24 +183,27 @@ function callActivatedHooks(queue) {
  * Push a watcher into the watcher queue.
  * Jobs with duplicate IDs will be skipped unless it's
  * pushed when the queue is being flushed.
+ * watcher.update方法，如果是异步更新的话，会把watcher传递给该queueWatcher函数
  * 将观察者放入到队列中，重复的观察者将被跳过，除非这是在刷新过程中
  */
 export function queueWatcher(watcher: Watcher) {
-  // 获取观察者的id
-  const id = watcher.id
-
-  if (has[id] != null) {
+  // 如果该观察者已经在该调度程序中存在，则直接返回
+  if (has[watcher.id] != null) {
     return
   }
-
+  // ???
   if (watcher === Dep.target && watcher.noRecurse) {
     return
   }
 
-  has[id] = true
+  // 将watcher.id在has中标记为true
+  has[watcher.id] = true
+  // 将watcher放入queue中
+  // 如果不是刷新中，则直接放入
   if (!flushing) {
     queue.push(watcher)
   } else {
+    // 如果是刷新状态，则watcher已排序，将watcher放入尽可能尽快执行的位置
     // if already flushing, splice the watcher based on its id
     // if already past its id, it will be run next immediately.
     let i = queue.length - 1
@@ -248,14 +212,52 @@ export function queueWatcher(watcher: Watcher) {
     }
     queue.splice(i + 1, 0, watcher)
   }
-  // queue the flush
+
+  // 如果该调度程序还不是待执行状态
+  // 则将该调度程序设置为待执行状态，
+  // 将主方法flushSchedulerQueue筛选调度程序队列传递给nextTick
+  // nextTick将flushSchedulerQueue添加到微任务队列中
   if (!waiting) {
     waiting = true
-
-    if (__DEV__ && !config.async) {
-      flushSchedulerQueue()
-      return
-    }
     nextTick(flushSchedulerQueue)
   }
 }
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+

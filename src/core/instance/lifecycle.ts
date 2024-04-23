@@ -1,7 +1,5 @@
-import config from '../config'
-import Watcher, { WatcherOptions } from '../observer/watcher'
-import { mark, measure } from '../util/perf'
-import VNode, { createEmptyVNode } from '../vdom/vnode'
+import Watcher from '../observer/watcher'
+import VNode from '../vdom/vnode'
 import { updateComponentListeners } from './events'
 import { resolveSlots } from './render-helpers/resolve-slots'
 import { toggleObserving } from '../observer/index'
@@ -23,6 +21,10 @@ import { syncSetupProxy } from 'v3/apiSetup'
 export let activeInstance: any = null
 export let isUpdatingChildComponent: boolean = false
 
+/**
+ * 设置活跃的vm
+ * @param vm
+ */
 export function setActiveInstance(vm: Component) {
   const prevActiveInstance = activeInstance
   activeInstance = vm
@@ -54,6 +56,7 @@ export function initLifecycle(vm: Component) {
   vm.$refs = {}
 
   vm._provided = parent ? parent._provided : Object.create(null)
+  // vm._watcher指向vm对应的渲染函数的观察者对象
   vm._watcher = null
   vm._inactive = null
   vm._directInactive = false
@@ -70,18 +73,24 @@ export function initLifecycle(vm: Component) {
  */
 export function lifecycleMixin(Vue: typeof Component) {
   /**
-   *
+   * vm的组件更新方法,核心方法
    * @param vnode
    * @param hydrating
    */
   Vue.prototype._update = function (vnode: VNode, hydrating?: boolean) {
+    // 定义vm
     const vm: Component = this
+    // 将vm.$el赋值给prevEl
     const prevEl = vm.$el
+    // 将vm._vnode赋值给prevVnode
     const prevVnode = vm._vnode
+    // 设置活跃的vm
     const restoreActiveInstance = setActiveInstance(vm)
+    // 将vnode赋值给vm._vnode
     vm._vnode = vnode
     // Vue.prototype.__patch__ is injected in entry points
     // based on the rendering backend used.
+    // 如果prevVnode不存在，说明是第1次渲染
     if (!prevVnode) {
       // initial render
       // 精彩内容
@@ -90,6 +99,8 @@ export function lifecycleMixin(Vue: typeof Component) {
       // updates
       vm.$el = vm.__patch__(prevVnode, vnode)
     }
+    // 将活跃的vm复原
+    // 基本完成更新操作
     restoreActiveInstance()
     // update __vue__ reference
     if (prevEl) {
@@ -118,7 +129,9 @@ export function lifecycleMixin(Vue: typeof Component) {
    */
   Vue.prototype.$forceUpdate = function () {
     const vm: Component = this
+    // 如果vm被挂载，且没有被破坏，则存在vm._watcher指向vm的渲染函数对应的观察者对象
     if (vm._watcher) {
+      // 执行update方法，强制渲染
       vm._watcher.update()
     }
   }
@@ -166,6 +179,12 @@ export function lifecycleMixin(Vue: typeof Component) {
   }
 }
 
+/**
+ * vm.$mount()方法的主体
+ * @param vm
+ * @param el
+ * @param hydrating
+ */
 export function mountComponent(
   vm: Component,
   el: Element | null | undefined,
@@ -176,56 +195,11 @@ export function mountComponent(
   // 使用单文件组件的话，因为在编译时已经将template转换为render函数，所以无需使用vue的完整版，
   // 使用不带template编译的版本即可
   // 如果不存在render函数，那么将render函数设置为空VNode
-  if (!vm.$options.render) {
-    // @ts-expect-error invalid type
-    vm.$options.render = createEmptyVNode
-  }
+
   // 调用beforeMount钩子
   // 和created钩子基本在一起，中间做了将el或template编译为render的工作
   // 如果render已经存在，则基本没有做什么工作
   callHook(vm, 'beforeMount')
-
-  let updateComponent
-  /* istanbul ignore if */
-  if (__DEV__ && config.performance && mark) {
-    updateComponent = () => {
-      const name = vm._name
-      const id = vm._uid
-      const startTag = `vue-perf-start:${id}`
-      const endTag = `vue-perf-end:${id}`
-
-      mark(startTag)
-      const vnode = vm._render()
-      mark(endTag)
-      measure(`vue ${name} render`, startTag, endTag)
-
-      mark(startTag)
-      vm._update(vnode, hydrating)
-      mark(endTag)
-      measure(`vue ${name} patch`, startTag, endTag)
-    }
-  } else {
-    // 定义updateComponent函数，作为一个watcher对象的表达式
-    updateComponent = () => {
-      vm._update(vm._render(), hydrating)
-    }
-  }
-  // watcher观察者的配置
-  const watcherOptions: WatcherOptions = {
-    // 观察者在更新前调用的函数，
-    before() {
-      // 如果vm存在，vm已挂载，而且vm没有被销毁，则调用beforeUpdate钩子
-      if (vm._isMounted && !vm._isDestroyed) {
-        callHook(vm, 'beforeUpdate')
-      }
-    }
-  }
-
-  if (__DEV__) {
-    watcherOptions.onTrack = e => callHook(vm, 'renderTracked', [e])
-    watcherOptions.onTrigger = e => callHook(vm, 'renderTriggered', [e])
-  }
-
   // we set this to vm._watcher inside the watcher's constructor
   // since the watcher's initial patch may call $forceUpdate (e.g. inside child
   // component's mounted hook), which relies on vm._watcher being already defined
@@ -235,15 +209,27 @@ export function mountComponent(
   // 回调函数为空？那么变化时是如何触发更新的？
   new Watcher(
     vm,
-    updateComponent,
+    () => {
+      // vm._render()重新生成最新的VNode，然后调用vm._update方法进行更新
+      vm._update(vm._render(), hydrating)
+    },
     noop,
-    watcherOptions,
+    // watcher观察者的配置
+    {
+      // 观察者在更新前调用的函数，
+      before() {
+        // 如果vm存在，vm已挂载，而且vm没有被销毁，则调用beforeUpdate钩子
+        if (vm._isMounted && !vm._isDestroyed) {
+          callHook(vm, 'beforeUpdate')
+        }
+      }
+    },
     true /* isRenderWatcher */
   )
-  // 不是SSR
-  hydrating = false
-
+  // 此时DOM已经更新
   // flush buffer for flush: "pre" watchers queued in setup()
+  // 为什么需要刷新观察者？
+  // 为什么不需要刷新computed？
   const preWatchers = vm._preWatchers
   if (preWatchers) {
     for (let i = 0; i < preWatchers.length; i++) {

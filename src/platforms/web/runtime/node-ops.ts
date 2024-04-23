@@ -1,7 +1,13 @@
 import VNode from 'core/vdom/vnode'
 import { namespaceMap } from 'web/util/index'
 
+/**
+ * 创建一个真实DOM
+ * @param tagName
+ * @param vnode
+ */
 export function createElement(tagName: string, vnode: VNode): Element {
+  //
   const elm = document.createElement(tagName)
   if (tagName !== 'select') {
     return elm

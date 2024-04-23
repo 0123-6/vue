@@ -68,6 +68,7 @@ export type VNodeWithData = VNode & {
 // };
 
 /**
+ * vnode的结构
  * @internal
  */
 export interface VNodeData {

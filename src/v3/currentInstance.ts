@@ -17,7 +17,10 @@ export function getCurrentInstance(): { proxy: Component } | null {
  * @internal
  */
 export function setCurrentInstance(vm: Component | null = null) {
+  // 没有参数，则重置currentInstance
   if (!vm) currentInstance && currentInstance._scope.off()
+  // 设置currentInstance
   currentInstance = vm
+  // ???
   vm && vm._scope.on()
 }
