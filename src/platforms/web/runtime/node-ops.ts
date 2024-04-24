@@ -27,14 +27,28 @@ export function createElementNS(namespace: string, tagName: string): Element {
   return document.createElementNS(namespaceMap[namespace], tagName)
 }
 
+/**
+ * 创建一个文本node
+ * @param text
+ */
 export function createTextNode(text: string): Text {
   return document.createTextNode(text)
 }
 
+/**
+ * 创建一个备注node
+ * @param text
+ */
 export function createComment(text: string): Comment {
   return document.createComment(text)
 }
 
+/**
+ * 在parentNode中插入一个node，插入位置为parentNode.referenceNode之前
+ * @param parentNode
+ * @param newNode
+ * @param referenceNode
+ */
 export function insertBefore(
   parentNode: Node,
   newNode: Node,

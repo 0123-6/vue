@@ -63,6 +63,12 @@ function sameInputType(a, b) {
   return typeA === typeB || (isTextInputType(typeA) && isTextInputType(typeB))
 }
 
+/**
+ * 为数组创建key的map
+ * @param children
+ * @param beginIdx
+ * @param endIdx
+ */
 function createKeyToOldIdx(children, beginIdx, endIdx) {
   let i, key
   const map = {}
@@ -483,6 +489,15 @@ export function createPatchFunction(backend) {
 
   /**
    * 更新子dom
+   * 1. 当oldStartIdx <= oldEndIdx && newStartIdx <= newEndIdx
+   * 1.1 如果oldStartVnode未定义，将指针向右移动一位
+   * 1.2 如果oldEndVnode未定义，将指针向左移动一位
+   * 1.3 如果oldStartVnode和newStartVnode表示同一个真实DOM，则递归调用patchVnode,然后将oldStartIdx和newStartIdx分别向右移动一位
+   * 1.4 如果oldEndVnode和newEndVnode表示同一个真实DOM，则递归调用patchVnode,然后将oldEndIdx和newEndIdx分别向左移动一位
+   * 1.5 如果oldStartVnode和newEndVnode表示同一个真实DOM，则递归调用patchVnode，然后将oldStartIdx向右移动一位，将newEndIdx向左移动一位
+   * 1.6 如果oldEndVnode和newStartVnode表示同一个真实DOM，则递归调用patchVnode，然后将oldEndIdx向左移动一位，将newStartIdx向右移动一位
+   * 1.7
+   *
    * 核心算法
    * @param parentElm
    * @param oldCh
@@ -511,17 +526,16 @@ export function createPatchFunction(backend) {
     // to ensure removed elements stay in correct relative positions
     // during leaving transitions
     const canMove = !removeOnly
-
-    if (__DEV__) {
-      checkDuplicateKeys(newCh)
-    }
-
+    // 在满足条件时遍历oldCh和newCh
     while (oldStartIdx <= oldEndIdx && newStartIdx <= newEndIdx) {
+      // 如果oldStartVnode未定义，将指针向右移动一位
       if (isUndef(oldStartVnode)) {
         oldStartVnode = oldCh[++oldStartIdx] // Vnode has been moved left
       } else if (isUndef(oldEndVnode)) {
+        // 如果oldEndVnode未定义，将指针向左移动一位
         oldEndVnode = oldCh[--oldEndIdx]
       } else if (sameVnode(oldStartVnode, newStartVnode)) {
+        // 如果oldStartVnode和newStartVnode表示同一个真实DOM，则递归调用patchVnode,然后将oldStartIdx和newStartIdx分别向右移动一位
         patchVnode(
           oldStartVnode,
           newStartVnode,
@@ -532,6 +546,7 @@ export function createPatchFunction(backend) {
         oldStartVnode = oldCh[++oldStartIdx]
         newStartVnode = newCh[++newStartIdx]
       } else if (sameVnode(oldEndVnode, newEndVnode)) {
+        // 如果oldEndVnode和newEndVnode表示同一个真实DOM，则递归调用patchVnode,然后将oldEndIdx和newEndIdx分别向左移动一位
         patchVnode(
           oldEndVnode,
           newEndVnode,
@@ -543,6 +558,7 @@ export function createPatchFunction(backend) {
         newEndVnode = newCh[--newEndIdx]
       } else if (sameVnode(oldStartVnode, newEndVnode)) {
         // Vnode moved right
+        // 如果oldStartVnode和newEndVnode表示同一个真实DOM，则递归调用patchVnode，然后将oldStartIdx向右移动一位，将newEndIdx向左移动一位
         patchVnode(
           oldStartVnode,
           newEndVnode,
@@ -560,6 +576,7 @@ export function createPatchFunction(backend) {
         newEndVnode = newCh[--newEndIdx]
       } else if (sameVnode(oldEndVnode, newStartVnode)) {
         // Vnode moved left
+        // 如果oldEndVnode和newStartVnode表示同一个真实DOM，则递归调用patchVnode，然后将oldEndIdx向左移动一位，将newStartIdx向右移动一位
         patchVnode(
           oldEndVnode,
           newStartVnode,
@@ -572,13 +589,16 @@ export function createPatchFunction(backend) {
         oldEndVnode = oldCh[--oldEndIdx]
         newStartVnode = newCh[++newStartIdx]
       } else {
+        // 定义oldKeyToIdx
         if (isUndef(oldKeyToIdx))
           oldKeyToIdx = createKeyToOldIdx(oldCh, oldStartIdx, oldEndIdx)
         idxInOld = isDef(newStartVnode.key)
           ? oldKeyToIdx[newStartVnode.key]
           : findIdxInOld(newStartVnode, oldCh, oldStartIdx, oldEndIdx)
+        // 如果newStartVnode对应的真实DOM在oldCh中没有与之对应的
         if (isUndef(idxInOld)) {
           // New element
+          // 创建一个新元素，然后呢？？？
           createElm(
             newStartVnode,
             insertedVnodeQueue,
@@ -589,8 +609,11 @@ export function createPatchFunction(backend) {
             newStartIdx
           )
         } else {
+          // 如果newStartVnode对应的真实DOM，在oldCh中找到了对应的
           vnodeToMove = oldCh[idxInOld]
+          // 如果oldCh[idxInOld]和newStartVnode表示的真实DOM是同一个
           if (sameVnode(vnodeToMove, newStartVnode)) {
+            // 递归调用patchVnode，
             patchVnode(
               vnodeToMove,
               newStartVnode,
@@ -598,6 +621,7 @@ export function createPatchFunction(backend) {
               newCh,
               newStartIdx
             )
+            // 将oldCh对应的位置置为undefined
             oldCh[idxInOld] = undefined
             canMove &&
               nodeOps.insertBefore(
@@ -607,6 +631,7 @@ export function createPatchFunction(backend) {
               )
           } else {
             // same key but different element. treat as new element
+            // 相同的key，但不是表示相同的DOM，也创建新元素，相当于未找到
             createElm(
               newStartVnode,
               insertedVnodeQueue,
@@ -618,6 +643,7 @@ export function createPatchFunction(backend) {
             )
           }
         }
+        // 将newStartIdx向右移动一位
         newStartVnode = newCh[++newStartIdx]
       }
     }
@@ -654,6 +680,13 @@ export function createPatchFunction(backend) {
     }
   }
 
+  /**
+   * 在oldCh数组中，寻找和node表示相同DOM的vnode的下标并返回
+   * @param node
+   * @param oldCh
+   * @param start
+   * @param end
+   */
   function findIdxInOld(node, oldCh, start, end) {
     for (let i = start; i < end; i++) {
       const c = oldCh[i]
@@ -664,6 +697,13 @@ export function createPatchFunction(backend) {
   /**
    * oldVNode不是真实的DOM，而且oldVNode和VNode是同一个节点
    * 给oldVnode打补丁
+   * 1. oldVnode和vnode是同一个对象，直接返回
+   * 2. 如果vnode是文本节点,直接修改文字，然后返回
+   * 3. 如果vnode不是文本节点，
+   * 3.1 如果oldVnode和vnode都有子元素,如果2个子元素不一样，调用updateChildren(elm, oldCh, ch)
+   * 3.2 只有vnode有子元素,如果oldVnode.text存在，则清空text;addVnodes(elm, null, ch, 0, ch.length - 1, insertedVnodeQueue)
+   * 3.3 只有oldvnode有子元素,removeVnodes(oldCh, 0, oldCh.length - 1)
+   * 3.4 oldVnode和vnode都没有子元素，而且oldVnode有text
    * @param oldVnode
    * @param vnode
    * @param insertedVnodeQueue
@@ -736,7 +776,7 @@ export function createPatchFunction(backend) {
       for (i = 0; i < cbs.update.length; ++i) cbs.update[i](oldVnode, vnode)
       if (isDef((i = data.hook)) && isDef((i = i.update))) i(oldVnode, vnode)
     }
-    // 如果vnode.text为定义
+    // 如果vnode.text未定义，也就是vnode不是文本节点
     if (isUndef(vnode.text)) {
       // 如果2个vnode都有子元素
       if (isDef(oldCh) && isDef(ch)) {
@@ -755,7 +795,7 @@ export function createPatchFunction(backend) {
         nodeOps.setTextContent(elm, '')
       }
     } else if (oldVnode.text !== vnode.text) {
-      // 如果都设置了，但是不一样
+      // 如果vnode是文本节点
       nodeOps.setTextContent(elm, vnode.text)
     }
     if (isDef(data)) {
