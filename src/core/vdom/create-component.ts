@@ -52,13 +52,21 @@ const componentVNodeHooks = {
     }
   },
 
+  /**
+   * 当组件属性更新时，有子组件使用了这个属性作为attr，则调用该函数
+   * @param oldVnode
+   * @param vnode
+   */
   prepatch(oldVnode: MountedComponentVNode, vnode: MountedComponentVNode) {
+    // 获取vnode的组件optioons
     const options = vnode.componentOptions
+    // 将oldVnode的组件实例赋值给vnode的componentInstance,也就是当前正在更新组件的子组件
     const child = (vnode.componentInstance = oldVnode.componentInstance)
+    // 更新子组件
     updateChildComponent(
-      child,
-      options.propsData, // updated props
-      options.listeners, // updated listeners
+      child, // vm
+      options.propsData, // updated props最新的props
+      options.listeners, // updated listeners，最新的listeners
       vnode, // new parent vnode
       options.children // new children
     )

@@ -1,10 +1,7 @@
 import type { Component } from 'types/component'
 import {
-  tip,
   toArray,
   isArray,
-  hyphenate,
-  formatComponentName,
   invokeWithErrorHandling
 } from '../util/index'
 import { updateListeners } from '../vdom/helpers/index'
@@ -43,6 +40,12 @@ function createOnceHandler(event, fn) {
   }
 }
 
+/**
+ * 将父组件的事件附加到子组件上
+ * @param vm
+ * @param listeners
+ * @param oldListeners
+ */
 export function updateComponentListeners(
   vm: Component,
   listeners: Object,
@@ -73,8 +76,7 @@ export function eventsMixin(Vue: typeof Component) {
   const hookRE = /^hook:/
   /**
    * Vue.prototype.$on方法的实现
-   * 添加自定义事件，
-   * 为一个事件或一组事件绑定处理函数
+   * 为vm添加一个订阅指定事件的函数
    * @param event
    * @param fn
    */
@@ -119,7 +121,7 @@ export function eventsMixin(Vue: typeof Component) {
       vm.$off(event, on)
       fn.apply(vm, arguments)
     }
-    // 有被用到？
+    // 取消订阅会用到
     on.fn = fn
     // 将on闭包函数添加到vm._events[event]数组中
     vm.$on(event, on)
@@ -184,23 +186,6 @@ export function eventsMixin(Vue: typeof Component) {
    */
   Vue.prototype.$emit = function (event: string): Component {
     const vm: Component = this
-    if (__DEV__) {
-      // 在开发环境中，如果事件不是全小写，则触发警告
-      const lowerCaseEvent = event.toLowerCase()
-      if (lowerCaseEvent !== event && vm._events[lowerCaseEvent]) {
-        tip(
-          `Event "${lowerCaseEvent}" is emitted in component ` +
-            `${formatComponentName(
-              vm
-            )} but the handler is registered for "${event}". ` +
-            `Note that HTML attributes are case-insensitive and you cannot use ` +
-            `v-on to listen to camelCase events when using in-DOM templates. ` +
-            `You should probably use "${hyphenate(
-              event
-            )}" instead of "${event}".`
-        )
-      }
-    }
     // 获取vm._events[event]数组
     let cbs = vm._events[event]
     if (cbs) {

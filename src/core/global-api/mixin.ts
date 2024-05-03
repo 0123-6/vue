@@ -3,7 +3,7 @@ import { mergeOptions } from '../util/index'
 
 export function initMixin(Vue: GlobalAPI) {
   /**
-   * 给Vue构造函数天机mixin静态方法
+   * 给Vue构造函数添加mixin静态方法
    * @param mixin
    */
   Vue.mixin = function (mixin: Object) {

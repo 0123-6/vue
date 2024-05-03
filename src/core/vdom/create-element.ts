@@ -24,6 +24,7 @@ const ALWAYS_NORMALIZE = 2
 
 // wrapper function for providing a more flexible interface
 // without getting yelled at by flow
+// _c 创建一个Vnode虚拟节点
 export function createElement(
   context: Component,
   tag: any,
@@ -61,6 +62,7 @@ export function _createElement(
     return createEmptyVNode()
   }
   // object syntax in v-bind
+  // 如果存在is属性，则将is的值作为tag
   if (isDef(data) && isDef(data.is)) {
     tag = data.is
   }

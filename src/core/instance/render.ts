@@ -1,6 +1,8 @@
 import {
+  warn,
   nextTick,
   emptyObject,
+  handleError,
   defineReactive,
   isArray
 } from '../util/index'
@@ -9,8 +11,9 @@ import { createElement } from '../vdom/create-element'
 import { installRenderHelpers } from './render-helpers/index'
 import { resolveSlots } from './render-helpers/resolve-slots'
 import { normalizeScopedSlots } from '../vdom/helpers/normalize-scoped-slots'
-import VNode from '../vdom/vnode'
+import VNode, { createEmptyVNode } from '../vdom/vnode'
 
+import { isUpdatingChildComponent } from './lifecycle'
 import type { Component } from 'types/component'
 import { currentInstance, setCurrentInstance } from 'v3/currentInstance'
 import { syncSetupSlots } from 'v3/apiSetup'
@@ -44,22 +47,44 @@ export function initRender(vm: Component) {
   // they need to be reactive so that HOCs using them are always updated
   const parentData = parentVnode && parentVnode.data
 
-  // 将vm.$attrs定义为响应式
-  defineReactive(
-    vm,
-    '$attrs',
-    (parentData && parentData.attrs) || emptyObject,
-    null,
-    true
-  )
-  // 将vm.$listeners定义为响应式
-  defineReactive(
-    vm,
-    '$listeners',
-    options._parentListeners || emptyObject,
-    null,
-    true
-  )
+  /* istanbul ignore else */
+  if (__DEV__) {
+    defineReactive(
+      vm,
+      '$attrs',
+      (parentData && parentData.attrs) || emptyObject,
+      () => {
+        !isUpdatingChildComponent && warn(`$attrs is readonly.`, vm)
+      },
+      true
+    )
+    defineReactive(
+      vm,
+      '$listeners',
+      options._parentListeners || emptyObject,
+      () => {
+        !isUpdatingChildComponent && warn(`$listeners is readonly.`, vm)
+      },
+      true
+    )
+  } else {
+    // 将vm.$attrs定义为响应式
+    defineReactive(
+      vm,
+      '$attrs',
+      (parentData && parentData.attrs) || emptyObject,
+      null,
+      true
+    )
+    // 将vm.$listeners定义为响应式
+    defineReactive(
+      vm,
+      '$listeners',
+      options._parentListeners || emptyObject,
+      null,
+      true
+    )
+  }
 }
 
 export let currentRenderingInstance: Component | null = null
@@ -86,17 +111,17 @@ export function renderMixin(Vue: typeof Component) {
   }
 
   /**
-   * 定义Vue.prototype._render方法,返回一个VNode对象
+   * 定义Vue.prototype._render方法
+   * 返回一个VNode对象
    */
   Vue.prototype._render = function (): VNode {
-    // 定义vm指向this
     const vm: Component = this
-    // vm.$options._parentVnode存在,而且vm已经挂载了
-    // 这说明当前vm是子组件，需要设置下vm的作用域
-    if (vm.$options._parentVnode && vm._isMounted) {
+    const { render, _parentVnode } = vm.$options
+
+    if (_parentVnode && vm._isMounted) {
       vm.$scopedSlots = normalizeScopedSlots(
         vm.$parent!,
-        vm.$options._parentVnode.data!.scopedSlots,
+        _parentVnode.data!.scopedSlots,
         vm.$slots,
         vm.$scopedSlots
       )
@@ -107,36 +132,55 @@ export function renderMixin(Vue: typeof Component) {
 
     // set parent vnode. this allows render functions to have access
     // to the data on the placeholder node.
-    // ???
-    vm.$vnode = vm.$options._parentVnode!
+    vm.$vnode = _parentVnode!
     // render self
-    // 这行代码将当前活动的组件实例保存在 prevInst 变量中
     const prevInst = currentInstance
-    // 这行代码将当前正在渲染的组件实例保存在 prevRenderInst 变量中
     const prevRenderInst = currentRenderingInstance
-
-    // 设置当前的vm
-    setCurrentInstance(vm)
-    // 设置当前正在渲染对象为当前vm
-    currentRenderingInstance = vm
-
-    // 核心操作,调用vm.$options.render函数，this为vm._renderProxy,参数为1个vm.$createElement
-    // 渲染过程中取值，好像没有触发响应式？
-    let vnode = vm.$options.render.call(vm._renderProxy, vm.$createElement)
-
-    // 恢复正在渲染实例为之前的实例
-    currentRenderingInstance = prevRenderInst
-    // 恢复之前的实例
-    setCurrentInstance(prevInst)
-
+    let vnode
+    try {
+      setCurrentInstance(vm)
+      currentRenderingInstance = vm
+      vnode = render.call(vm._renderProxy, vm.$createElement)
+    } catch (e: any) {
+      handleError(e, vm, `render`)
+      // return error render result,
+      // or previous vnode to prevent render error causing blank component
+      /* istanbul ignore else */
+      if (__DEV__ && vm.$options.renderError) {
+        try {
+          vnode = vm.$options.renderError.call(
+            vm._renderProxy,
+            vm.$createElement,
+            e
+          )
+        } catch (e: any) {
+          handleError(e, vm, `renderError`)
+          vnode = vm._vnode
+        }
+      } else {
+        vnode = vm._vnode
+      }
+    } finally {
+      currentRenderingInstance = prevRenderInst
+      setCurrentInstance(prevInst)
+    }
     // if the returned array contains only a single node, allow it
     if (isArray(vnode) && vnode.length === 1) {
       vnode = vnode[0]
     }
+    // return empty vnode in case the render function errored out
+    if (!(vnode instanceof VNode)) {
+      if (__DEV__ && isArray(vnode)) {
+        warn(
+          'Multiple root nodes returned from render function. Render function ' +
+            'should return a single root node.',
+          vm
+        )
+      }
+      vnode = createEmptyVNode()
+    }
     // set parent
-    // 将新vnode.parent设置为vm.$options._parentVnode
-    vnode.parent = vm.$options._parentVnode
-    // VNode创建完成，返回创建的vnode
+    vnode.parent = _parentVnode
     return vnode
   }
 }

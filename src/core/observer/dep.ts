@@ -1,4 +1,3 @@
-import config from '../config'
 import { DebuggerOptions, DebuggerEventExtraInfo } from 'v3'
 
 // 依赖的id，初始值为0
@@ -114,21 +113,8 @@ export default class Dep {
     // stabilize the subscriber list first
     // 因为subs可能存在null项，所以需要首先获取正常的subs
     const subs = this.subs.filter(s => s) as DepTarget[]
-    if (__DEV__ && !config.async) {
-      // subs aren't sorted in scheduler if not running async
-      // we need to sort them now to make sure they fire in correct
-      // order
-      subs.sort((a, b) => a.id - b.id)
-    }
     for (let i = 0, l = subs.length; i < l; i++) {
       const sub = subs[i]
-      if (__DEV__ && info) {
-        sub.onTrigger &&
-          sub.onTrigger({
-            effect: subs[i],
-            ...info
-          })
-      }
       sub.update()
     }
   }

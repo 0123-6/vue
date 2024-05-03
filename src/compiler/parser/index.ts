@@ -545,6 +545,10 @@ export function parseFor(exp: string): ForParseResult | undefined {
   return res
 }
 
+/**
+ * 处理v-if
+ * @param el
+ */
 function processIf(el) {
   const exp = getAndRemoveAttr(el, 'v-if')
   if (exp) {

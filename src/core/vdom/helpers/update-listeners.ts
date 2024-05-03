@@ -28,6 +28,11 @@ const normalizeEvent = cached(
   }
 )
 
+/**
+ * 父组件的v-on的事件会传入到子组件的this.$listener中，从而可以调用
+ * @param fns
+ * @param vm
+ */
 export function createFnInvoker(
   fns: Function | Array<Function>,
   vm?: Component
@@ -60,6 +65,15 @@ export function createFnInvoker(
   return invoker
 }
 
+/**
+ * 将父组件的事件附加到子组件上
+ * @param on
+ * @param oldOn
+ * @param add
+ * @param remove
+ * @param createOnceHandler
+ * @param vm
+ */
 export function updateListeners(
   on: Object,
   oldOn: Object,

@@ -247,6 +247,14 @@ export function mountComponent(
   return vm
 }
 
+/**
+ * 更新子组件，当父组件更新时，可能需要更新子组件的属性、监听器、插槽等。
+ * @param vm 子组件实例
+ * @param propsData 更新后的props数据
+ * @param listeners 更新后的事件监听器
+ * @param parentVnode 父组件的VNode
+ * @param renderChildren 子组件中的子节点（插槽内容）
+ */
 export function updateChildComponent(
   vm: Component,
   propsData: Record<string, any> | null | undefined,
@@ -264,6 +272,7 @@ export function updateChildComponent(
   // check if there are dynamic scopedSlots (hand-written or compiled but with
   // dynamic slot names). Static scoped slots compiled from template has the
   // "$stable" marker.
+  // 检查是否有动态作用域插槽，可能需要强制更新。
   const newScopedSlots = parentVnode.data.scopedSlots
   const oldScopedSlots = vm.$scopedSlots
   const hasDynamicScopedSlot = !!(
@@ -276,29 +285,35 @@ export function updateChildComponent(
   // Any static slot children from the parent may have changed during parent's
   // update. Dynamic scoped slots may also have changed. In such cases, a forced
   // update is necessary to ensure correctness.
+  // 确定是否需要强制更新，这通常发生在父组件的静态插槽或动态作用域插槽发生变化时。
   let needsForceUpdate = !!(
     renderChildren || // has new static slots
     vm.$options._renderChildren || // has old static slots
     hasDynamicScopedSlot
   )
-
+  // 更新组件的虚拟节点和父节点信息
   const prevVNode = vm.$vnode
   vm.$options._parentVnode = parentVnode
+  // 更新组件的占位VNode
   vm.$vnode = parentVnode // update vm's placeholder node without re-render
 
   if (vm._vnode) {
     // update child tree's parent
+    // 更新子树的父节点
     vm._vnode.parent = parentVnode
   }
+  // 更新插槽子节点
   vm.$options._renderChildren = renderChildren
 
   // update $attrs and $listeners hash
   // these are also reactive so they may trigger child update if the child
   // used them during render
+  // 更新$attrs和$listeners，确保它们的响应性
   const attrs = parentVnode.data.attrs || emptyObject
   if (vm._attrsProxy) {
     // force update if attrs are accessed and has changed since it may be
     // passed to a child component.
+    // 如果$attrs改变，强制更新子组件
     if (
       syncSetupProxy(
         vm._attrsProxy,
@@ -314,6 +329,7 @@ export function updateChildComponent(
   vm.$attrs = attrs
 
   // update listeners
+  // 更新事件监听器
   listeners = listeners || emptyObject
   const prevListeners = vm.$options._parentListeners
   if (vm._listenersProxy) {
@@ -329,21 +345,28 @@ export function updateChildComponent(
   updateComponentListeners(vm, listeners, prevListeners)
 
   // update props
+  // 更新props
   if (propsData && vm.$options.props) {
+    // 暂时关闭观察，避免额外的响应式操作
     toggleObserving(false)
     const props = vm._props
     const propKeys = vm.$options._propKeys || []
     for (let i = 0; i < propKeys.length; i++) {
       const key = propKeys[i]
       const propOptions: any = vm.$options.props // wtf flow?
+      // 更新prop，而子组件props是响应式的，自然触发了子组件的vm._watcher.update()方法,
+      // update方法会将该watcher放入调度程序的queue中，从而动态更新
       props[key] = validateProp(key, propOptions, propsData, vm)
     }
+    // 恢复观察
     toggleObserving(true)
     // keep a copy of raw propsData
+    // 保持propsData的副本
     vm.$options.propsData = propsData
   }
 
   // resolve slots + force update if has children
+  // 解析插槽，如果需要，强制更新组件
   if (needsForceUpdate) {
     vm.$slots = resolveSlots(renderChildren, parentVnode.context)
     vm.$forceUpdate()

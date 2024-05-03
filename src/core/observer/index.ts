@@ -55,7 +55,7 @@ export class Observer {
   // 构造函数
   constructor(public value: any, public shallow = false, public mock = false) {
     // this.value = value
-    // 设置this.dep
+    // 设置this.dep,这里会触发第3个Dep的创建，为vm.$data
     this.dep = mock ? mockDep : new Dep()
     // 设置this.vmCount
     this.vmCount = 0
@@ -185,9 +185,8 @@ export function defineReactive(
       if (Dep.target) {
         // 调用dep依赖对象的depend方法
         dep.depend()
-        // 如果childOb存在
+        // 如果childOb存在,Dep.target同时订阅childOb
         if (childOb) {
-          // ???什么意思？
           childOb.dep.depend()
           if (isArray(value)) {
             // ???
@@ -204,9 +203,6 @@ export function defineReactive(
       // 如果值相等的话，直接返回Object.is
       if (!hasChanged(value, newVal)) {
         return
-      }
-      if (__DEV__ && customSetter) {
-        customSetter()
       }
       // 分4种情况
       // 1. setter存在
@@ -232,18 +228,8 @@ export function defineReactive(
       }
       // 和执行defineReactive一样，重新设置childOb
       childOb = shallow ? newVal && newVal.__ob__ : observe(newVal, false, mock)
-      if (__DEV__) {
-        dep.notify({
-          type: TriggerOpTypes.SET,
-          target: obj,
-          key,
-          newValue: newVal,
-          oldValue: value
-        })
-      } else {
-        // 调用dep.notify()
-        dep.notify()
-      }
+      // 调用dep.notify()
+      dep.notify()
     }
   })
 
@@ -272,11 +258,6 @@ export function set(
   key: any,
   val: any
 ): any {
-  if (__DEV__ && (isUndef(target) || isPrimitive(target))) {
-    warn(
-      `Cannot set reactive property on undefined, null, or primitive value: ${target}`
-    )
-  }
   // 判断target是否为只读，如果是的话，直接返回
   if (isReadonly(target)) {
     __DEV__ && warn(`Set operation on key "${key}" failed: target is readonly.`)
@@ -319,18 +300,8 @@ export function set(
   // 调用new Observer()时遍历vm._data时使用的函数defineReactive函数将ob.value添加key属性，值为val
   // ob.value存在吗？不是被注释了吗？
   defineReactive(ob.value, key, val, undefined, ob.shallow, ob.mock)
-  if (__DEV__) {
-    ob.dep.notify({
-      type: TriggerOpTypes.ADD,
-      target: target,
-      key,
-      newValue: val,
-      oldValue: undefined
-    })
-  } else {
-    // 通知所有依赖了该对象的观察者
-    ob.dep.notify()
-  }
+  // 通知所有依赖了该对象的观察者
+  ob.dep.notify()
   return val
 }
 

@@ -1,7 +1,5 @@
-import config from '../config'
 import Watcher from '../observer/watcher'
 import Dep, { pushTarget, popTarget } from '../observer/dep'
-import { isUpdatingChildComponent } from './lifecycle'
 import { initSetup } from 'v3/apiSetup'
 
 import {
@@ -18,14 +16,12 @@ import {
   noop,
   hasOwn,
   isArray,
-  hyphenate,
   isReserved,
   handleError,
   nativeWatch,
   validateProp,
   isPlainObject,
   isServerRendering,
-  isReservedAttribute,
   invokeWithErrorHandling,
   isFunction
 } from '../util/index'
@@ -85,54 +81,30 @@ export function initState(vm: Component) {
   }
 }
 
+/**
+ * 初始化props
+ * @param vm
+ * @param propsOptions
+ */
 function initProps(vm: Component, propsOptions: Object) {
+  // 获取propsData
   const propsData = vm.$options.propsData || {}
-  const props = (vm._props = shallowReactive({}))
+  // 定义vm._props
+  vm._props = shallowReactive({})
   // cache prop keys so that future props updates can iterate using Array
   // instead of dynamic object key enumeration.
-  const keys: string[] = (vm.$options._propKeys = [])
+  vm.$options._propKeys = []
   const isRoot = !vm.$parent
   // root instance props should be converted
   if (!isRoot) {
     toggleObserving(false)
   }
   for (const key in propsOptions) {
-    keys.push(key)
+    vm.$options._propKeys.push(key)
     const value = validateProp(key, propsOptions, propsData, vm)
-    /* istanbul ignore else */
-    if (__DEV__) {
-      const hyphenatedKey = hyphenate(key)
-      if (
-        isReservedAttribute(hyphenatedKey) ||
-        config.isReservedAttr(hyphenatedKey)
-      ) {
-        warn(
-          `"${hyphenatedKey}" is a reserved attribute and cannot be used as component prop.`,
-          vm
-        )
-      }
-      defineReactive(
-        props,
-        key,
-        value,
-        () => {
-          if (!isRoot && !isUpdatingChildComponent) {
-            warn(
-              `Avoid mutating a prop directly since the value will be ` +
-                `overwritten whenever the parent component re-renders. ` +
-                `Instead, use a data or computed property based on the prop's ` +
-                `value. Prop being mutated: "${key}"`,
-              vm
-            )
-          }
-        },
-        true /* shallow */
-      )
-    } else {
-      defineReactive(props, key, value, undefined, true /* shallow */)
-    }
-    // static props are already proxied on the component's prototype
-    // during Vue.extend(). We only need to proxy props defined at
+    defineReactive(vm._props, key, value, undefined, true /* shallow */)
+    // static vm._props are already proxied on the component's prototype
+    // during Vue.extend(). We only need to proxy vm._props defined at
     // instantiation here.
     if (!(key in vm)) {
       proxy(vm, `_props`, key)
@@ -453,4 +425,6 @@ export function stateMixin(Vue: typeof Component) {
       watcher.teardown()
     }
   }
+
+
 }

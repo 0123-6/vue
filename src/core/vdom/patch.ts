@@ -528,14 +528,14 @@ export function createPatchFunction(backend) {
     const canMove = !removeOnly
     // 在满足条件时遍历oldCh和newCh
     while (oldStartIdx <= oldEndIdx && newStartIdx <= newEndIdx) {
-      // 如果oldStartVnode未定义，将指针向右移动一位
+      // 1如果oldStartVnode未定义，将指针向右移动一位
       if (isUndef(oldStartVnode)) {
         oldStartVnode = oldCh[++oldStartIdx] // Vnode has been moved left
       } else if (isUndef(oldEndVnode)) {
-        // 如果oldEndVnode未定义，将指针向左移动一位
+        // 2如果oldEndVnode未定义，将指针向左移动一位
         oldEndVnode = oldCh[--oldEndIdx]
       } else if (sameVnode(oldStartVnode, newStartVnode)) {
-        // 如果oldStartVnode和newStartVnode表示同一个真实DOM，则递归调用patchVnode,然后将oldStartIdx和newStartIdx分别向右移动一位
+        // 3如果oldStartVnode和newStartVnode表示同一个真实DOM，则递归调用patchVnode,然后将oldStartIdx和newStartIdx分别向右移动一位
         patchVnode(
           oldStartVnode,
           newStartVnode,
@@ -546,7 +546,7 @@ export function createPatchFunction(backend) {
         oldStartVnode = oldCh[++oldStartIdx]
         newStartVnode = newCh[++newStartIdx]
       } else if (sameVnode(oldEndVnode, newEndVnode)) {
-        // 如果oldEndVnode和newEndVnode表示同一个真实DOM，则递归调用patchVnode,然后将oldEndIdx和newEndIdx分别向左移动一位
+        // 4如果oldEndVnode和newEndVnode表示同一个真实DOM，则递归调用patchVnode,然后将oldEndIdx和newEndIdx分别向左移动一位
         patchVnode(
           oldEndVnode,
           newEndVnode,
@@ -558,7 +558,7 @@ export function createPatchFunction(backend) {
         newEndVnode = newCh[--newEndIdx]
       } else if (sameVnode(oldStartVnode, newEndVnode)) {
         // Vnode moved right
-        // 如果oldStartVnode和newEndVnode表示同一个真实DOM，则递归调用patchVnode，然后将oldStartIdx向右移动一位，将newEndIdx向左移动一位
+        // 5如果oldStartVnode和newEndVnode表示同一个真实DOM，则递归调用patchVnode，然后将oldStartIdx向右移动一位，将newEndIdx向左移动一位
         patchVnode(
           oldStartVnode,
           newEndVnode,
@@ -576,7 +576,7 @@ export function createPatchFunction(backend) {
         newEndVnode = newCh[--newEndIdx]
       } else if (sameVnode(oldEndVnode, newStartVnode)) {
         // Vnode moved left
-        // 如果oldEndVnode和newStartVnode表示同一个真实DOM，则递归调用patchVnode，然后将oldEndIdx向左移动一位，将newStartIdx向右移动一位
+        // 6如果oldEndVnode和newStartVnode表示同一个真实DOM，则递归调用patchVnode，然后将oldEndIdx向左移动一位，将newStartIdx向右移动一位
         patchVnode(
           oldEndVnode,
           newStartVnode,
@@ -589,7 +589,7 @@ export function createPatchFunction(backend) {
         oldEndVnode = oldCh[--oldEndIdx]
         newStartVnode = newCh[++newStartIdx]
       } else {
-        // 定义oldKeyToIdx
+        // 7定义oldKeyToIdx
         if (isUndef(oldKeyToIdx))
           oldKeyToIdx = createKeyToOldIdx(oldCh, oldStartIdx, oldEndIdx)
         idxInOld = isDef(newStartVnode.key)
@@ -698,6 +698,7 @@ export function createPatchFunction(backend) {
    * oldVNode不是真实的DOM，而且oldVNode和VNode是同一个节点
    * 给oldVnode打补丁
    * 1. oldVnode和vnode是同一个对象，直接返回
+   * 1.2 vnode.data.hook.prepatch方法存在时,调用它
    * 2. 如果vnode是文本节点,直接修改文字，然后返回
    * 3. 如果vnode不是文本节点，
    * 3.1 如果oldVnode和vnode都有子元素,如果2个子元素不一样，调用updateChildren(elm, oldCh, ch)
@@ -761,7 +762,7 @@ export function createPatchFunction(backend) {
     let i
     // 设置data为vnode.data
     const data = vnode.data
-    // ???
+    // vnode.data.hook.prepatch方法存在时,调用它
     if (isDef(data) && isDef((i = data.hook)) && isDef((i = i.prepatch))) {
       i(oldVnode, vnode)
     }

@@ -1,4 +1,3 @@
-import { initProxy } from './proxy'
 import { initState } from './state'
 import { initRender } from './render'
 import { initEvents } from './events'
@@ -19,6 +18,13 @@ let uid = 0
 export function initMixin(Vue: typeof Component) {
   // 给Vue.prototype._init赋值
   Vue.prototype._init = function (options?: Record<string, any>) {
+    /**
+     * beforeCreate钩子前主要做了什么工作？
+     * 1. 定义vm的一些基本属性，比如_uid,_isVue,__v_skip
+     * 2. 如果options._isComponent,表示这是子组件，初始化一般子组件属性，比如_parentListeners获取父组件的一些方法
+     * 3. 初始化生命周期相关的属性，
+     * 4. 初始化事件，定义vm._events
+     */
     // 定义vm指向当前this
     const vm: Component = this
     // a uid
@@ -36,6 +42,7 @@ export function initMixin(Vue: typeof Component) {
     vm._scope.parent = undefined
     vm._scope._vm = true
     // merge options
+    // 如果这个vm是子组件的话，调用初始化一般组件函数
     if (options && options._isComponent) {
       // optimize internal component instantiation
       // since dynamic options merging is pretty slow, and none of the
@@ -50,11 +57,7 @@ export function initMixin(Vue: typeof Component) {
       )
     }
     /* istanbul ignore else */
-    if (__DEV__) {
-      initProxy(vm)
-    } else {
-      vm._renderProxy = vm
-    }
+    vm._renderProxy = vm
     // expose real self
     vm._self = vm
     // 初始化生命周期
@@ -88,13 +91,20 @@ export function initMixin(Vue: typeof Component) {
   }
 }
 
+/**
+ * 初始化一般子组件
+ * @param vm
+ * @param options
+ */
 export function initInternalComponent(
   vm: Component,
   options: InternalComponentOptions
 ) {
+  // 定义vm.$options,以vm.options为原型
   const opts = (vm.$options = Object.create((vm.constructor as any).options))
   // doing this because it's faster than dynamic enumeration.
   const parentVnode = options._parentVnode
+  // vm.$options.parent =
   opts.parent = options.parent
   opts._parentVnode = parentVnode
 
