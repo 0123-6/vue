@@ -418,13 +418,17 @@ export function mergeOptions(
     checkComponents(child)
   }
 
+  // 如果child是一个函数
   if (isFunction(child)) {
     // @ts-expect-error
     child = child.options
   }
 
+  // 规范化props
   normalizeProps(child, vm)
+  // 规范化inject
   normalizeInject(child, vm)
+  // 规范化指令
   normalizeDirectives(child)
 
   // Apply extends and mixins on the child options,
@@ -444,9 +448,11 @@ export function mergeOptions(
 
   const options: ComponentOptions = {} as any
   let key
+  // 合并
   for (key in parent) {
     mergeField(key)
   }
+  // 合并
   for (key in child) {
     if (!hasOwn(parent, key)) {
       mergeField(key)
