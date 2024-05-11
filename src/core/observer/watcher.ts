@@ -194,6 +194,7 @@ export default class Watcher implements DepTarget {
   /**
    * Clean up for dependency collection.
    * 依赖收集完成的清理和重置工作
+   * router-view组件第1次渲染时观察了很多依赖，之后会观察很少？？？
    */
   cleanupDeps() {
     let i = this.deps.length
